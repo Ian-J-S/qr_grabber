@@ -23,11 +23,23 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.heading("QR Grabber");
+            if self.clipboard.is_none() {
+                self.content = Some("ERROR - unable to connect to system clipboard!".to_string());
+            }
+            else if ui.button("Decode from clipboard").clicked() {
+                self.content = qr_from_clipboard().ok();
+            }
+            else {
+                let display_text = self.content
+                    .as_deref()
+                    .unwrap_or("");
+                ui.label(display_text);
+            }
         });
     }
 }
 
-fn qr_decode() -> Result<(), Error> {
+fn qr_from_clipboard() -> Result<String, Error> {
     let mut cb = Clipboard::new()?;
 
     let cb_img = cb.get_image()?;
@@ -46,14 +58,11 @@ fn qr_decode() -> Result<(), Error> {
         return Err("No QR codes detected".into());
     }
 
-    for grid in grids {
-        match grid.decode() {
-            Ok((_metadata, content)) => println!("{content}"),
-            Err(e) => eprintln!("{e}"),
-        }
+    match grids[0].decode() {
+        Ok((_metadata, content)) => Ok(content),
+        Err(e) => Ok(e.to_string())
     }
 
-    Ok(())
 }
 
 fn main() -> eframe::Result {
