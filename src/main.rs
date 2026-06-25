@@ -79,9 +79,18 @@ fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
         return Err("No QR codes detected".into());
     }
 
-    match grids[0].decode() {
-        Ok((_metadata, content)) => Ok(content),
-        Err(e) => Ok(e.to_string()),
+    let mut last_error = None;
+
+    for grid in grids {
+        match grid.decode() {
+            Ok((_metadata, content)) => return Ok(content),
+            Err(e) => last_error = Some(e),
+        }
+    }
+
+    match last_error {
+        Some(e) => Err(e.into()),
+        None => Err("No readable QR codes detected".into()),
     }
 }
 
