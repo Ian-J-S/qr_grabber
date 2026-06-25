@@ -1,5 +1,5 @@
-use eframe::egui;
 use arboard::Clipboard;
+use eframe::egui;
 use image::{DynamicImage, RgbaImage};
 
 type Error = Box<dyn std::error::Error>;
@@ -27,13 +27,13 @@ impl eframe::App for App {
             ui.heading("QR Grabber");
             if self.clipboard.is_none() {
                 self.content = Some("ERROR - unable to connect to system clipboard!".to_string());
-            }
-            else if ui.button("From clipboard").clicked()
-                && let Some(clipboard) = self.clipboard.as_mut() {
-                    self.content = Some(match qr_from_clipboard(clipboard) {
-                        Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
-                        Err(e) => format!("ERROR - {e}"),
-                    });                
+            } else if ui.button("From clipboard").clicked()
+                && let Some(clipboard) = self.clipboard.as_mut()
+            {
+                self.content = Some(match qr_from_clipboard(clipboard) {
+                    Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
+                    Err(e) => format!("ERROR - {e}"),
+                });
             }
 
             ui.add_space(10.0);
@@ -43,13 +43,12 @@ impl eframe::App for App {
 
                 ui.horizontal(|ui| {
                     if ui.button("Copy").clicked() {
-
-                        self.copied_msg = self.clipboard.as_mut()
-                            .map(|cb| {
-                                match cb.set_text(content) {
-                                    Ok(()) => "Copied!".to_string(),
-                                    Err(e) => format!("ERROR - {e}")
-                                }
+                        self.copied_msg = self
+                            .clipboard
+                            .as_mut()
+                            .map(|cb| match cb.set_text(content) {
+                                Ok(()) => "Copied!".to_string(),
+                                Err(e) => format!("ERROR - {e}"),
                             })
                             .unwrap_or_else(|| "ERROR - Unable to copy!".to_string());
                     }
@@ -82,9 +81,8 @@ fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
 
     match grids[0].decode() {
         Ok((_metadata, content)) => Ok(content),
-        Err(e) => Ok(e.to_string())
+        Err(e) => Ok(e.to_string()),
     }
-
 }
 
 fn main() -> eframe::Result {
@@ -97,8 +95,6 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "QR Grabber",
         options,
-        Box::new(|_cc| {
-            Ok(Box::<App>::default())
-        }),
+        Box::new(|_cc| Ok(Box::<App>::default())),
     )
 }
