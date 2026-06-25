@@ -1,9 +1,33 @@
+use eframe::egui;
 use arboard::Clipboard;
 use image::{DynamicImage, RgbaImage};
 
 type Error = Box<dyn std::error::Error>;
 
-fn main() -> Result<(), Error> {
+struct App {
+    clipboard: Option<Clipboard>,
+    content: Option<String>,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        let clipboard = Clipboard::new().ok();
+        App {
+            clipboard,
+            content: None,
+        }
+    }
+}
+
+impl eframe::App for App {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
+            ui.heading("QR Grabber");
+        });
+    }
+}
+
+fn qr_decode() -> Result<(), Error> {
     let mut cb = Clipboard::new()?;
 
     let cb_img = cb.get_image()?;
@@ -30,4 +54,20 @@ fn main() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+fn main() -> eframe::Result {
+    env_logger::init();
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_inner_size([250.0, 110.0]),
+        ..Default::default()
+    };
+
+    eframe::run_native(
+        "QR Grabber",
+        options,
+        Box::new(|_cc| {
+            Ok(Box::<App>::default())
+        }),
+    )
 }
