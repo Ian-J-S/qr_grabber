@@ -7,6 +7,7 @@ type Error = Box<dyn std::error::Error>;
 struct App {
     clipboard: Option<Clipboard>,
     content: Option<String>,
+    text_copied: bool,
 }
 
 impl Default for App {
@@ -15,6 +16,7 @@ impl Default for App {
         App {
             clipboard,
             content: None,
+            text_copied: false,
         }
     }
 }
@@ -26,22 +28,24 @@ impl eframe::App for App {
             if self.clipboard.is_none() {
                 self.content = Some("ERROR - unable to connect to system clipboard!".to_string());
             }
-            else if ui.button("Decode from clipboard").clicked() {
-                self.content = qr_from_clipboard().ok();
+            else if ui.button("From clipboard").clicked()
+                && let Some(clipboard) = self.clipboard.as_mut() {
+                    self.content = Some(match qr_from_clipboard(clipboard) {
+                        Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
+                        Err(e) => format!("ERROR - {e}"),
+                    });                
             }
-            else {
-                let display_text = self.content
-                    .as_deref()
-                    .unwrap_or("");
-                ui.label(display_text);
+
+            ui.add_space(10.0);
+
+            if let Some(content) = self.content.as_deref() {
+                ui.label(content);
             }
         });
     }
 }
 
-fn qr_from_clipboard() -> Result<String, Error> {
-    let mut cb = Clipboard::new()?;
-
+fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
     let cb_img = cb.get_image()?;
     let img_width = cb_img.width as u32;
     let img_height = cb_img.height as u32;
