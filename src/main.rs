@@ -7,7 +7,7 @@ type Error = Box<dyn std::error::Error>;
 struct App {
     clipboard: Option<Clipboard>,
     content: Option<String>,
-    text_copied: bool,
+    copied_msg: String,
 }
 
 impl Default for App {
@@ -16,7 +16,7 @@ impl Default for App {
         App {
             clipboard,
             content: None,
-            text_copied: false,
+            copied_msg: String::from(""),
         }
     }
 }
@@ -40,6 +40,24 @@ impl eframe::App for App {
 
             if let Some(content) = self.content.as_deref() {
                 ui.label(content);
+
+                ui.horizontal(|ui| {
+                    if ui.button("Copy").clicked() {
+
+                        self.copied_msg = self.clipboard.as_mut()
+                            .map(|cb| {
+                                match cb.set_text(content) {
+                                    Ok(()) => "Copied!".to_string(),
+                                    Err(e) => format!("ERROR - {e}")
+                                }
+                            })
+                            .unwrap_or_else(|| "ERROR - Unable to copy!".to_string());
+                    }
+
+                    if !self.copied_msg.is_empty() {
+                        ui.label(&self.copied_msg);
+                    }
+                });
             }
         });
     }
