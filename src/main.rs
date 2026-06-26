@@ -34,13 +34,19 @@ impl eframe::App for App {
                     Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
                     Err(e) => format!("ERROR - {e}"),
                 });
+                // Reset "Copied!" message when a new image is loaded
+                if !self.copied_msg.is_empty() {
+                    self.copied_msg.clear();
+                }
             }
 
             ui.add_space(10.0);
 
+            // Show decoded content
             if let Some(content) = self.content.as_deref() {
                 ui.label(content);
 
+                // Button - copies QR contents to clipboard
                 ui.horizontal(|ui| {
                     if ui.button("Copy").clicked() {
                         self.copied_msg = self
@@ -67,11 +73,10 @@ fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
     let img_width = cb_img.width as u32;
     let img_height = cb_img.height as u32;
 
+    // Convert copied image so that rqrr can read it
     let rgba = RgbaImage::from_raw(img_width, img_height, cb_img.bytes.into_owned())
         .ok_or("Failed to parse clipboard image as RGBA")?;
-
     let gray = DynamicImage::ImageRgba8(rgba).to_luma8();
-
     let mut prepared = rqrr::PreparedImage::prepare(gray);
 
     let grids = prepared.detect_grids();
@@ -90,7 +95,7 @@ fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
 
     match last_error {
         Some(e) => Err(e.into()),
-        None => Err("No readable QR codes detected".into()),
+        None => Err("No QR codes detected".into()),
     }
 }
 
