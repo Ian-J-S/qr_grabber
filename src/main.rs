@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use arboard::Clipboard;
 use eframe::egui;
@@ -11,7 +11,7 @@ struct App {
     clipboard: Option<Clipboard>,
     content: Option<String>,
     copied_msg: String,
-    picked_file: Option<PathBuf>,
+    file_display_name: String,
 }
 
 impl Default for App {
@@ -21,7 +21,7 @@ impl Default for App {
             clipboard,
             content: None,
             copied_msg: String::from(""),
-            picked_file: None,
+            file_display_name: String::from(""),
         }
     }
 }
@@ -36,6 +36,7 @@ impl eframe::App for App {
                 } else if ui.button("From clipboard").clicked()
                     && let Some(clipboard) = self.clipboard.as_mut()
                 {
+                    self.file_display_name.clear();
                     self.content = Some(match qr_from_clipboard(clipboard) {
                         Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
                         Err(e) => format!("ERROR - {e}"),
@@ -50,9 +51,10 @@ impl eframe::App for App {
                 else if ui.button("From file").clicked() {
                     self.content = None;
                     self.copied_msg.clear();
-                    self.picked_file = FileDialog::new().pick_file();
+                    self.file_display_name.clear();
+                    let picked_file = FileDialog::new().pick_file();
 
-                    if let Some(file) = self.picked_file.as_deref() {
+                    if let Some(file) = picked_file.as_deref() {
                         self.content = Some(match qr_from_file(file) {
                             Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
                             Err(e) => format!("ERROR - {e}"),
@@ -62,16 +64,17 @@ impl eframe::App for App {
                             let name = basename.to_string_lossy();
 
                             // Truncate filename if it's too long
-                            let display = if name.chars().count() > 30 {
+                            let display = if name.chars().count() > 10 {
                                 format!("{}...", name.chars().take(10).collect::<String>())
                             } else {
                                 name.into_owned()
                             };
 
-                            ui.label(display);
+                            self.file_display_name = display;
                         }
                     }
                 }
+                ui.label(&self.file_display_name);
 
             });
 
