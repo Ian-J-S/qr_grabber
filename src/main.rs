@@ -1,6 +1,9 @@
+use std::path::{Path, PathBuf};
+
 use arboard::Clipboard;
 use eframe::egui;
 use image::{DynamicImage, RgbaImage};
+use rfd::FileDialog;
 
 type Error = Box<dyn std::error::Error>;
 
@@ -8,6 +11,7 @@ struct App {
     clipboard: Option<Clipboard>,
     content: Option<String>,
     copied_msg: String,
+    picked_file: Option<PathBuf>,
 }
 
 impl Default for App {
@@ -17,28 +21,59 @@ impl Default for App {
             clipboard,
             content: None,
             copied_msg: String::from(""),
+            picked_file: None,
         }
     }
 }
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.heading("QR Grabber");
-            if self.clipboard.is_none() {
-                self.content = Some("ERROR - unable to connect to system clipboard!".to_string());
-            } else if ui.button("From clipboard").clicked()
-                && let Some(clipboard) = self.clipboard.as_mut()
-            {
-                self.content = Some(match qr_from_clipboard(clipboard) {
-                    Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
-                    Err(e) => format!("ERROR - {e}"),
-                });
-                // Reset "Copied!" message when a new image is loaded
-                if !self.copied_msg.is_empty() {
-                    self.copied_msg.clear();
+            ui.horizontal(|ui|{
+                if self.clipboard.is_none() {
+                    self.content = Some("ERROR - unable to connect to system clipboard!".to_string());
+                } else if ui.button("From clipboard").clicked()
+                    && let Some(clipboard) = self.clipboard.as_mut()
+                {
+                    self.content = Some(match qr_from_clipboard(clipboard) {
+                        Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
+                        Err(e) => format!("ERROR - {e}"),
+                    });
+                    // Reset "Copied!" message when a new image is loaded
+                    if !self.copied_msg.is_empty() {
+                        self.copied_msg.clear();
+                    }
                 }
-            }
+                // Button - open default file picker and look for 
+                // QR codes within
+                else if ui.button("From file").clicked() {
+                    self.content = None;
+                    self.copied_msg.clear();
+                    self.picked_file = FileDialog::new().pick_file();
+
+                    if let Some(file) = self.picked_file.as_deref() {
+                        self.content = Some(match qr_from_file(file) {
+                            Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
+                            Err(e) => format!("ERROR - {e}"),
+                        });
+
+                        if let Some(basename) = file.file_name() {
+                            let name = basename.to_string_lossy();
+
+                            // Truncate filename if it's too long
+                            let display = if name.chars().count() > 30 {
+                                format!("{}...", name.chars().take(10).collect::<String>())
+                            } else {
+                                name.into_owned()
+                            };
+
+                            ui.label(display);
+                        }
+                    }
+                }
+
+            });
 
             ui.add_space(10.0);
 
@@ -97,6 +132,22 @@ fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
         Some(e) => Err(e.into()),
         None => Err("No QR codes detected".into()),
     }
+}
+
+fn qr_from_file(path: &Path) -> Result<String, Error> {
+    let img = image::open(path)?.into_luma8();
+        
+    let mut img = rqrr::PreparedImage::prepare(img);
+
+    let grids = img.detect_grids();
+    if grids.is_empty() {
+        return Err("No QR codes detected".into());
+    }
+
+    let (_metadata, content) = grids[0].decode()?;
+    println!("{content}");
+
+    Ok(content)
 }
 
 fn main() -> eframe::Result {

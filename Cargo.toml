@@ -5,9 +5,10 @@ edition = "2024"
 
 [dependencies]
 arboard = { version = "3.6.1", features = ["wayland-data-control"] }
-eframe = "0.34.3"
+eframe = "0.35.0"
 env_logger = "0.11.10"
 image = "0.25.10"
+rfd = "0.17.2"
 rqrr = "0.10.1"
 
 [profile.release-lto]
