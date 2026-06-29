@@ -112,7 +112,18 @@ fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
     let rgba = RgbaImage::from_raw(img_width, img_height, cb_img.bytes.into_owned())
         .ok_or("Failed to parse clipboard image as RGBA")?;
     let gray = DynamicImage::ImageRgba8(rgba).to_luma8();
-    let mut prepared = rqrr::PreparedImage::prepare(gray);
+
+    decode_from_grayscale(gray)
+}
+
+fn qr_from_file(path: &Path) -> Result<String, Error> {
+    let img = image::open(path)?.into_luma8();
+        
+    decode_from_grayscale(img)
+}
+
+fn decode_from_grayscale(img: image::GrayImage) -> Result<String, Error> {
+    let mut prepared = rqrr::PreparedImage::prepare(img);
 
     let grids = prepared.detect_grids();
     if grids.is_empty() {
@@ -132,22 +143,6 @@ fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
         Some(e) => Err(e.into()),
         None => Err("No QR codes detected".into()),
     }
-}
-
-fn qr_from_file(path: &Path) -> Result<String, Error> {
-    let img = image::open(path)?.into_luma8();
-        
-    let mut img = rqrr::PreparedImage::prepare(img);
-
-    let grids = img.detect_grids();
-    if grids.is_empty() {
-        return Err("No QR codes detected".into());
-    }
-
-    let (_metadata, content) = grids[0].decode()?;
-    println!("{content}");
-
-    Ok(content)
 }
 
 fn main() -> eframe::Result {
