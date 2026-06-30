@@ -52,7 +52,9 @@ impl eframe::App for App {
                     self.content = None;
                     self.copied_msg.clear();
                     self.file_display_name.clear();
-                    let picked_file = FileDialog::new().pick_file();
+                    let picked_file = FileDialog::new()
+                        .add_filter("Images", &["png", "jpg", "jpeg", "bmp", "gif", "webp"])
+                        .pick_file();
 
                     if let Some(file) = picked_file.as_deref() {
                         self.content = Some(match qr_from_file(file) {
