@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use arboard::Clipboard;
-use eframe::egui;
+use iced::{Element, alignment::Vertical, border, padding, widget::{Button, button, column, container, row, text}};
 use image::{DynamicImage, RgbaImage};
 use rfd::FileDialog;
 
@@ -9,107 +9,137 @@ type Error = Box<dyn std::error::Error>;
 
 struct App {
     clipboard: Option<Clipboard>,
-    content: Option<String>,
+    content: String,
     copied_msg: String,
     file_display_name: String,
 }
 
 impl Default for App {
     fn default() -> Self {
-        let clipboard = Clipboard::new().ok();
         App {
-            clipboard,
-            content: None,
-            copied_msg: String::from(""),
-            file_display_name: String::from(""),
+            clipboard: Clipboard::new().ok(),
+            content: String::new(),
+            copied_msg: String::new(),
+            file_display_name: String::new(),
         }
     }
 }
 
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ui, |ui| {
-            ui.heading("QR Grabber");
-            ui.horizontal(|ui|{
-                if self.clipboard.is_none() {
-                    self.content = Some("ERROR - unable to connect to system clipboard!".to_string());
-                } else if ui.button("From clipboard").clicked()
-                    && let Some(clipboard) = self.clipboard.as_mut()
-                {
-                    self.file_display_name.clear();
-                    self.content = Some(match qr_from_clipboard(clipboard) {
+#[derive(Debug, Clone)]
+enum Message {
+    FromClipboard,
+    FromFile,
+    NewCopiedMsg,
+}
+
+fn styled_button(label: &str, message: Message) -> Button<'_, Message>{
+    button(
+        text(label)
+            .size(12.0)
+            .align_y(Vertical::Center)
+    )
+    .on_press(message)
+   .style(|theme, status| {
+        let mut style = button::primary(theme, status);
+        style.border.radius = border::Radius::from(5.0);
+        style
+    })
+   .height(20)
+}
+
+impl App {
+    fn update(&mut self, message: Message) {
+        match message {
+            Message::FromClipboard => {
+                self.copied_msg.clear();
+                self.content = if let Some(clipboard) = self.clipboard.as_mut() {
+                    match qr_from_clipboard(clipboard) {
                         Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
                         Err(e) => format!("ERROR - {e}"),
-                    });
-                    // Reset "Copied!" message when a new image is loaded
-                    if !self.copied_msg.is_empty() {
-                        self.copied_msg.clear();
                     }
+                } else {
+                    String::from("ERROR - unable to connect to system clipboard")
                 }
-                // Button - open default file picker and look for 
-                // QR codes within
-                else if ui.button("From file").clicked() {
-                    self.content = None;
-                    self.copied_msg.clear();
-                    self.file_display_name.clear();
-                    let picked_file = FileDialog::new()
-                        .add_filter("Images", &["png", "jpg", "jpeg", "bmp", "gif", "webp"])
-                        .pick_file();
-
-                    if let Some(file) = picked_file.as_deref() {
-                        self.content = Some(match qr_from_file(file) {
-                            Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
-                            Err(e) => format!("ERROR - {e}"),
-                        });
-
-                        if let Some(basename) = file.file_name() {
-                            let name = basename.to_string_lossy();
-
-                            // Truncate filename if it's too long
-                            let display = if name.chars().count() > 10 {
-                                format!("{}...", name.chars().take(10).collect::<String>())
-                            } else {
-                                name.into_owned()
-                            };
-
-                            self.file_display_name = display;
-                        }
-                    }
-                }
-                ui.label(&self.file_display_name);
-
-            });
-
-            ui.add_space(10.0);
-
-            // Show decoded content
-            if let Some(content) = self.content.as_deref() {
-                ui.label(content);
-
-                // Button - copies QR contents to clipboard
-                ui.horizontal(|ui| {
-                    if ui.button("Copy").clicked() {
-                        self.copied_msg = self
-                            .clipboard
-                            .as_mut()
-                            .map(|cb| match cb.set_text(content) {
-                                Ok(()) => "Copied!".to_string(),
-                                Err(e) => format!("ERROR - {e}"),
-                            })
-                            .unwrap_or_else(|| "ERROR - Unable to copy!".to_string());
-                    }
-
-                    if !self.copied_msg.is_empty() {
-                        ui.label(&self.copied_msg);
-                    }
-                });
             }
-        });
+            Message::FromFile => {
+                self.copied_msg.clear();
+                self.file_display_name.clear();
+                
+                let picked_file = FileDialog::new()
+                    .add_filter("Images", &["png", "jpg", "jpeg", "bmp", "gif", "webp"])
+                    .pick_file();
+
+                if let Some(file) = picked_file.as_deref() {
+                    self.content = match qr_from_file(file) {
+                        Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
+                        Err(e) => format!("ERROR - {e}"),
+                    };
+
+                    if let Some(basename) = file.file_name() {
+                        let name = basename.to_string_lossy();
+
+                        // Truncate filename if it's too long
+                        let display = if name.chars().count() > 10 {
+                            format!("{}...", name.chars().take(10).collect::<String>())
+                        } else {
+                            name.into_owned()
+                        };
+
+                        self.file_display_name = display;
+                    }
+                }
+            }
+            Message::NewCopiedMsg => {
+                self.copied_msg = self
+                    .clipboard
+                    .as_mut()
+                    .map(|cb| match cb.set_text(&self.content) {
+                        Ok(()) => "Copied!".to_string(),
+                        Err(e) => format!("ERROR - {e}"),
+                    })
+                    .unwrap_or_else(|| "ERROR - Unable to copy!".to_string());
+            }
+        }
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        let copy_row = if !self.content.is_empty() {
+            row![
+                styled_button("Copy", Message::NewCopiedMsg),
+                if !self.copied_msg.is_empty() {
+                    text(self.copied_msg.as_str()).size(14.0)
+                } else {
+                    text("")
+                },
+            ].spacing(5)
+        } else {
+            row![]
+        };
+
+        container(
+            column![
+                container(
+                    text("QR Grabber"),
+                ).padding(padding::bottom(5)),
+                row![
+                    styled_button("From clipboard", Message::FromClipboard),
+                    styled_button("From file", Message::FromFile),
+                ]
+                .spacing(10)
+                .padding(padding::bottom(15)),
+                container(text(&self.content).size(14.0))
+                    .padding(padding::bottom(5)),
+                copy_row,
+            ],
+        )
+        .padding(10)
+        .into()
     }
 }
 
 fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
     let cb_img = cb.get_image()?;
+
     let img_width = cb_img.width as u32;
     let img_height = cb_img.height as u32;
 
@@ -150,16 +180,8 @@ fn decode_from_grayscale(img: image::GrayImage) -> Result<String, Error> {
     }
 }
 
-fn main() -> eframe::Result {
-    env_logger::init();
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([250.0, 110.0]),
-        ..Default::default()
-    };
-
-    eframe::run_native(
-        "QR Grabber",
-        options,
-        Box::new(|_cc| Ok(Box::<App>::default())),
-    )
+fn main() -> iced::Result {
+    iced::application(App::default, App::update, App::view)
+        .window_size(iced::Size::new(250.0, 150.0))
+        .run()
 }
