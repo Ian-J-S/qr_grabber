@@ -48,18 +48,24 @@ fn styled_button(label: &str, message: Message) -> Button<'_, Message>{
 }
 
 impl App {
+    fn set_content(&mut self, result: Result<String, Error>) {
+        self.copied_msg.clear();
+
+        self.content = match result {
+            Ok(s) => s.trim_end_matches('/').to_string(),
+            Err(e) => format!("ERROR - {e}"),
+        };
+    }
+
     fn update(&mut self, message: Message) {
         match message {
             Message::FromClipboard => {
-                self.copied_msg.clear();
-                self.content = if let Some(clipboard) = self.clipboard.as_mut() {
-                    match qr_from_clipboard(clipboard) {
-                        Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
-                        Err(e) => format!("ERROR - {e}"),
-                    }
+                let result = if let Some(clipboard) = self.clipboard.as_mut() {
+                    qr_from_clipboard(clipboard)
                 } else {
-                    String::from("ERROR - unable to connect to system clipboard")
-                }
+                    Err("ERROR - unable to connect to system clipboard".into())
+                };
+                self.set_content(result);
             }
             Message::FromFile => {
                 self.copied_msg.clear();
@@ -70,10 +76,8 @@ impl App {
                     .pick_file();
 
                 if let Some(file) = picked_file.as_deref() {
-                    self.content = match qr_from_file(file) {
-                        Ok(s) => s.trim_end_matches('/').to_string(), // strip '/' from end
-                        Err(e) => format!("ERROR - {e}"),
-                    };
+                    let result= qr_from_file(file);
+                    self.set_content(result);
 
                     if let Some(basename) = file.file_name() {
                         let name = basename.to_string_lossy();
@@ -124,6 +128,7 @@ impl App {
                 row![
                     styled_button("From clipboard", Message::FromClipboard),
                     styled_button("From file", Message::FromFile),
+                    text(&self.file_display_name).size(14.0),
                 ]
                 .spacing(10)
                 .padding(padding::bottom(15)),
@@ -182,6 +187,6 @@ fn decode_from_grayscale(img: image::GrayImage) -> Result<String, Error> {
 
 fn main() -> iced::Result {
     iced::application(App::default, App::update, App::view)
-        .window_size(iced::Size::new(250.0, 150.0))
+        .window_size(iced::Size::new(300.0, 150.0))
         .run()
 }
