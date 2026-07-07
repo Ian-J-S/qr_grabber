@@ -1,13 +1,23 @@
 use std::path::Path;
 
 use arboard::Clipboard;
-use iced::{Element, alignment::Vertical, border, padding, widget::{Button, button, column, container, row, text}};
+use iced::{
+    Element,
+    alignment::Vertical,
+    border, padding,
+    widget::{Button, button, column, container, row, text},
+};
 use image::{DynamicImage, RgbaImage};
 use rfd::FileDialog;
 
 type Error = Box<dyn std::error::Error>;
 
 const REG_FONT_SIZE: f32 = 14.0;
+const HORIZONTAL_SPACING: u32 = 10;
+
+const BUTTON_LABEL_SIZE: f32 = 12.0;
+const BUTTON_RADIUS: f32 = 5.0;
+const BUTTON_HEIGHT: u32 = 20;
 
 struct App {
     clipboard: Option<Clipboard>,
@@ -20,9 +30,9 @@ impl Default for App {
     fn default() -> Self {
         App {
             clipboard: Clipboard::new().ok(),
-            content: String::new(),
-            copied_msg: String::new(),
-            file_display_name: String::new(),
+            content: Default::default(),
+            copied_msg: Default::default(),
+            file_display_name: Default::default(),
         }
     }
 }
@@ -34,19 +44,19 @@ enum Message {
     NewCopiedMsg,
 }
 
-fn styled_button(label: &str, message: Message) -> Button<'_, Message>{
+fn styled_button(label: &str, message: Message) -> Button<'_, Message> {
     button(
         text(label)
-            .size(12.0)
-            .align_y(Vertical::Center)
+            .size(BUTTON_LABEL_SIZE)
+            .align_y(Vertical::Center),
     )
     .on_press(message)
-   .style(|theme, status| {
+    .style(|theme, status| {
         let mut style = button::primary(theme, status);
-        style.border.radius = border::Radius::from(5.0);
+        style.border.radius = border::Radius::from(BUTTON_RADIUS);
         style
     })
-   .height(20)
+    .height(BUTTON_HEIGHT)
 }
 
 impl App {
@@ -72,13 +82,13 @@ impl App {
             Message::FromFile => {
                 self.copied_msg.clear();
                 self.file_display_name.clear();
-                
+
                 let picked_file = FileDialog::new()
                     .add_filter("Images", &["png", "jpg", "jpeg", "bmp", "gif", "webp"])
                     .pick_file();
 
                 if let Some(file) = picked_file.as_deref() {
-                    let result= qr_from_file(file);
+                    let result = qr_from_file(file);
                     self.set_content(result);
 
                     if let Some(basename) = file.file_name() {
@@ -117,28 +127,24 @@ impl App {
                 } else {
                     text("")
                 },
-            ].spacing(5)
+            ]
+            .spacing(HORIZONTAL_SPACING)
         } else {
             row![]
         };
 
-        container(
-            column![
-                container(
-                    text("QR Grabber"),
-                ).padding(padding::bottom(5)),
-                row![
-                    styled_button("From clipboard", Message::FromClipboard),
-                    styled_button("From file", Message::FromFile),
-                    text(&self.file_display_name).size(REG_FONT_SIZE),
-                ]
-                .spacing(10)
-                .padding(padding::bottom(15)),
-                container(text(&self.content).size(REG_FONT_SIZE))
-                    .padding(padding::bottom(5)),
-                copy_row,
-            ],
-        )
+        container(column![
+            container(text("QR Grabber"),).padding(padding::bottom(5)),
+            row![
+                styled_button("From clipboard", Message::FromClipboard),
+                styled_button("From file", Message::FromFile),
+                text(&self.file_display_name).size(REG_FONT_SIZE),
+            ]
+            .spacing(HORIZONTAL_SPACING)
+            .padding(padding::bottom(15)),
+            container(text(&self.content).size(REG_FONT_SIZE)).padding(padding::bottom(5)),
+            copy_row,
+        ])
         .padding(10)
         .into()
     }
@@ -160,7 +166,7 @@ fn qr_from_clipboard(cb: &mut Clipboard) -> Result<String, Error> {
 
 fn qr_from_file(path: &Path) -> Result<String, Error> {
     let img = image::open(path)?.into_luma8();
-        
+
     decode_from_grayscale(img)
 }
 
