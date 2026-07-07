@@ -7,6 +7,8 @@ use rfd::FileDialog;
 
 type Error = Box<dyn std::error::Error>;
 
+const REG_FONT_SIZE: f32 = 14.0;
+
 struct App {
     clipboard: Option<Clipboard>,
     content: String,
@@ -111,7 +113,7 @@ impl App {
             row![
                 styled_button("Copy", Message::NewCopiedMsg),
                 if !self.copied_msg.is_empty() {
-                    text(self.copied_msg.as_str()).size(14.0)
+                    text(self.copied_msg.as_str()).size(REG_FONT_SIZE)
                 } else {
                     text("")
                 },
@@ -128,11 +130,11 @@ impl App {
                 row![
                     styled_button("From clipboard", Message::FromClipboard),
                     styled_button("From file", Message::FromFile),
-                    text(&self.file_display_name).size(14.0),
+                    text(&self.file_display_name).size(REG_FONT_SIZE),
                 ]
                 .spacing(10)
                 .padding(padding::bottom(15)),
-                container(text(&self.content).size(14.0))
+                container(text(&self.content).size(REG_FONT_SIZE))
                     .padding(padding::bottom(5)),
                 copy_row,
             ],
